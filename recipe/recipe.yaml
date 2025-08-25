@@ -1,24 +1,32 @@
 context:
   name: petsc4py
-  version: "3.23.4"
+  version: "3.24.0a0"
   build: 0
   version_xy: ${{ (version | split('.'))[:2] | join('.') }}
+  python_min: "3.10"
 
 package:
   name: petsc4py
   version: ${{ version }}
 
 source:
-  url: https://pypi.org/packages/source/${{ name[0] }}/${{ name }}/${{ name }}-${{ version }}.tar.gz
-  sha256: e91a7020873131eb3afdd108ab6b523e1d136e67a3283a703f9bf330ae9eaccd
+  # url: https://pypi.org/packages/source/${{ name[0] }}/${{ name }}/${{ name }}-${{ version }}.tar.gz
+  url: https://gitlab.com/petsc/petsc/-/archive/b588a9366a03a8e02e0e9a612c549155ced7882d/petsc-main.tar.bz2
+  sha256: 529d1cf1930ee421a70e86d09dac7ae001f8514b88f78caf326fab8f0ddb6eb6
 
 build:
   number: ${{ build }}
-  skip: win
+  skip: win or (is_abi3 and not match(python, python_min + ".*"))
+  python:
+    version_independent: true
   script:
+    content:
+    - cd src/binding/petsc4py
     - ${{ PYTHON }} conf/cythonize.py
-    - export PETSC_DIR=$PREFIX
     - ${{ PYTHON }} -m pip -v install --no-deps .
+    env:
+      PETSC_DIR: "$PREFIX"
+      PETSC4PY_BUILD_PYSABI: "1"
 
 requirements:
   build:
@@ -36,6 +44,7 @@ requirements:
             - ${{ mpi }}
   host:
     - python
+    - python-abi3
     - cython
     - pip
     - setuptools
@@ -56,6 +65,18 @@ tests:
       pip_check: true
       imports:
         - petsc4py
+        - petsc4py.PETSc
+      python_version:
+        - ${{ python_min }}
+        - "3.12"
+        - "3.13"
+
+  - script:
+      - abi3audit $PREFIX/lib/python${{ python_min }}/site-packages/petsc4py/lib/*.so -s -v --assume-minimum-abi3 ${{ python_min }}
+    requirements:
+      run:
+        - python ${{ python_min }}.*
+        - abi3audit
 
 about:
   summary: Python bindings for PETSc
